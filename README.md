@@ -1,5 +1,7 @@
 # Apple Silicon LLM Memory Calculator
 
+**[🚀 Open the calculator →](https://meirm.github.io/-apple_silicon_llm_memory/)** — one HTML file, no install. *(First-time setup on GitHub: Settings → Pages → Deploy from a branch → `main` / `/` root. Until enabled, you can [view the source of `index.html`](https://github.com/meirm/-apple_silicon_llm_memory/blob/main/index.html) and download it.)*
+
 A single-file browser tool that answers one question: **"Will this LLM actually fit on my Mac?"**
 
 It fetches popular Hugging Face text-generation models, estimates total memory need (weights + KV cache + runtime overhead + safety margin), and compares it against a Mac's unified memory configuration. It also gives a rough decode-speed hint derived from the chip's memory bandwidth.
