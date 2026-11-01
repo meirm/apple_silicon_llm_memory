@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Apple Silicon LLM Memory Calculator</title>
+  <style>
+    :root{
+      --bg:#0b1020;--panel:#111831;--panel2:#0f152b;--text:#e7eefc;--muted:#9aa8c7;--line:#233154;
+      --good:#32d583;--warn:#fdb022;--bad:#f97066;--accent:#7c9cff;--chip:#17213e;
+      --shadow: 0 20px 60px rgba(0,0,0,.35);--radius:18px;
+    }
+    *{box-sizing:border-box} body{margin:0;background:radial-gradient(1000px 700px at 15% -10%,#1b2a61 0,#0b1020 50%),var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+    header{padding:28px 28px 8px;max-width:1280px;margin:auto} h1{margin:0 0 8px;font-size:clamp(28px,4vw,48px);line-height:1.02;letter-spacing:-.04em} p{color:var(--muted);line-height:1.5} a{color:#b8c7ff}.wrap{max-width:1280px;margin:auto;padding:16px 28px 40px;display:grid;grid-template-columns:380px 1fr;gap:18px}.card{background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.02));border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}.controls{padding:18px;position:sticky;top:14px;align-self:start}.grid{display:grid;gap:18px}.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.field{margin:0 0 14px}label{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#b8c2df;margin:0 0 7px}input,select,button{width:100%;border:1px solid var(--line);background:#0b1227;color:var(--text);border-radius:12px;padding:11px 12px;font-size:14px}input[type=range]{padding:0}button{cursor:pointer;background:linear-gradient(180deg,#5573ff,#3856db);border:0;font-weight:700}button.secondary{background:#121a35;border:1px solid var(--line);font-weight:600}.small{font-size:12px;color:var(--muted)}.pill{display:inline-flex;align-items:center;gap:6px;padding:6px 9px;border-radius:999px;background:var(--chip);border:1px solid var(--line);color:#cbd5f2;font-size:12px}.status{font-weight:800}.good{color:var(--good)}.warn{color:var(--warn)}.bad{color:var(--bad)}.muted{color:var(--muted)}.model-list{padding:0;overflow:hidden}.toolbar{display:grid;grid-template-columns:1fr 160px 120px;gap:10px;padding:14px;border-bottom:1px solid var(--line)}.models{max-height:560px;overflow:auto}.model{display:grid;grid-template-columns:1fr auto;gap:10px;padding:14px;border-bottom:1px solid rgba(255,255,255,.07);cursor:pointer}.model:hover,.model.active{background:rgba(124,156,255,.09)}.model b{display:block;font-size:14px;margin-bottom:6px}.model-meta{display:flex;gap:6px;flex-wrap:wrap}.summary{padding:18px}.hero{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}.metric{padding:16px;border-radius:16px;background:rgba(255,255,255,.035);border:1px solid var(--line)}.metric .num{font-size:28px;font-weight:850;letter-spacing:-.03em}.metric .lbl{color:var(--muted);font-size:12px;margin-top:4px}.bar{height:16px;border-radius:999px;background:#0b1227;border:1px solid var(--line);overflow:hidden}.bar>div{height:100%;width:0;background:linear-gradient(90deg,var(--good),var(--warn),var(--bad));transition:width .2s}.breakdown{display:grid;grid-template-columns:1fr 1fr;gap:18px}.table{width:100%;border-collapse:collapse}.table th,.table td{text-align:left;padding:10px 8px;border-bottom:1px solid rgba(255,255,255,.08);font-size:13px}.table th{color:#b8c2df;font-size:11px;text-transform:uppercase;letter-spacing:.08em}.note{padding:14px;border:1px dashed #33436d;border-radius:14px;background:rgba(124,156,255,.06)}.footer{max-width:1280px;margin:0 auto 30px;padding:0 28px;color:var(--muted);font-size:12px}.kbd{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;background:#101833;border:1px solid var(--line);border-radius:6px;padding:1px 5px}.loader{display:none}.loading .loader{display:inline}.err{color:var(--bad);font-size:13px;margin-top:8px;white-space:pre-wrap}@media(max-width:980px){.wrap{grid-template-columns:1fr}.controls{position:static}.hero,.breakdown{grid-template-columns:1fr 1fr}.toolbar{grid-template-columns:1fr}}@media(max-width:620px){.hero,.breakdown,.row{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<header>
+  <h1>Apple Silicon LLM Memory Calculator</h1>
+  <p>Fetch popular Hugging Face text-generation models, estimate model weights + KV cache + runtime overhead, and compare them with Mac unified-memory configurations.</p>
+</header>
+<main class="wrap">
+  <section class="card controls">
+    <div class="field">
+      <label>Mac preset</label>
+      <select id="macPreset"></select>
+      <div id="presetNote" class="small" style="margin-top:8px"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Unified memory GB</label><input id="unifiedGB" type="number" min="8" step="1"></div>
+      <div class="field"><label>Memory bandwidth GB/s</label><input id="bandwidth" type="number" min="50" step="1"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>System reserve GB</label><input id="reserveGB" type="number" min="0" step="1" value="8"></div>
+      <div class="field"><label>Safety margin %</label><input id="marginPct" type="number" min="0" step="1" value="15"></div>
+    </div>
+    <div class="field"><label>Context tokens: <span id="ctxLabel"></span></label><input id="ctx" type="range" min="4096" max="1048576" step="4096" value="131072"></div>
+    <div class="row">
+      <div class="field"><label>Quantization</label><select id="quant"></select></div>
+      <div class="field"><label>KV precision</label><select id="kvBytes"><option value="2">FP16/BF16</option><option value="1">8-bit KV</option><option value="0.5">4-bit KV</option></select></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Runtime overhead GB</label><input id="runtimeGB" type="number" min="0" step="0.5" value="3"></div>
+      <div class="field"><label>Batch / parallel seq</label><input id="batch" type="number" min="1" step="1" value="1"></div>
+    </div>
+    <div class="field"><label>Manual model params B</label><input id="manualParams" type="number" min="0" step="0.1" placeholder="optional"></div>
+    <div class="row">
+      <button id="fetchBtn">Fetch popular models</button>
+      <button id="customBtn" class="secondary">Use manual model</button>
+    </div>
+    <p class="small">Tip: select a model below, or enter params manually. Context dominates at 128k+ tokens, especially with FP16 KV cache.</p>
+    <div id="error" class="err"></div>
+  </section>
+
+  <section class="grid">
+    <section class="card summary">
+      <div id="selected" class="pill">No model selected</div>
+      <h2 id="fitTitle" style="margin:14px 0 14px;font-size:30px;letter-spacing:-.03em">Select or enter a model</h2>
+      <div class="hero">
+        <div class="metric"><div class="num" id="totalMem">—</div><div class="lbl">Estimated memory</div></div>
+        <div class="metric"><div class="num" id="usableMem">—</div><div class="lbl">Usable Mac memory</div></div>
+        <div class="metric"><div class="num" id="kvMem">—</div><div class="lbl">KV cache</div></div>
+        <div class="metric"><div class="num" id="speedHint">—</div><div class="lbl">Bandwidth hint</div></div>
+      </div>
+      <div class="bar" title="memory usage"><div id="barFill"></div></div>
+      <p id="explain" class="small"></p>
+      <div class="breakdown">
+        <div>
+          <h3>Memory breakdown</h3>
+          <table class="table"><tbody id="breakRows"></tbody></table>
+        </div>
+        <div>
+          <h3>Detected model architecture</h3>
+          <table class="table"><tbody id="archRows"></tbody></table>
+        </div>
+      </div>
+      <div class="note" style="margin-top:16px">
+        <b>Assumptions:</b> weight memory = parameters × quantized bits per weight; KV cache = 2 × layers × context × hidden size × KV bytes × GQA ratio × batch; then runtime overhead and safety margin are added. Real llama.cpp / MLX / Ollama usage can differ because of graph buffers, Metal allocation, quant format, rope scaling, MoE active experts, and OS memory pressure. Presets marked TBD/projected are editable placeholders, not confirmed Apple specifications.
+      </div>
+    </section>
+
+    <section class="card model-list">
+      <div class="toolbar">
+        <input id="search" placeholder="Search Hugging Face models, e.g. qwen, llama, gemma" />
+        <select id="sort"><option value="downloads">Downloads</option><option value="likes">Likes</option><option value="trendingScore">Trending</option></select>
+        <button id="searchBtn" class="secondary">Search</button>
+      </div>
+      <div id="models" class="models"><div style="padding:18px;color:var(--muted)">Click “Fetch popular models”.</div></div>
+    </section>
+  </section>
+</main>
+<div class="footer">
+  Uses the public Hugging Face Hub JSON API from the browser. Apple bandwidth presets use per-chip bandwidth where known; projected/TBD entries remain editable. Some model repositories are gated, omit parameter counts, or are adapters rather than full models. For those, this file estimates parameters from repo name or config.
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const HF = 'https://huggingface.co';
+
+const macs = [
+  // M-series presets. bw = unified memory bandwidth in GB/s.
+  // source: official = Apple spec page/newsroom; reported = reputable press/report; projected = not official, editable placeholder.
+  {group:'Older / current reference', name:'M1 / M2 basic — 8GB', chip:'M1/M2', mem:8, bw:68, source:'reference', note:'Older low-end Apple Silicon reference. Bandwidth varies by exact model.'},
+  {group:'M1 official', name:'M1 basic — 16GB', chip:'M1', mem:16, bw:68, source:'official', note:'Official M1 bandwidth: 68.25 GB/s (rounded to 68). M1 tops out at 16GB.'},
+  {group:'M1 official', name:'M1 Pro — 16GB', chip:'M1 Pro', mem:16, bw:200, source:'official', note:'Official M1 Pro bandwidth: 200 GB/s.'},
+  {group:'M1 official', name:'M1 Pro — 32GB', chip:'M1 Pro', mem:32, bw:200, source:'official', note:'Official M1 Pro bandwidth: 200 GB/s.'},
+  {group:'M1 official', name:'M1 Max — 32GB', chip:'M1 Max', mem:32, bw:400, source:'official', note:'Official M1 Max bandwidth: 400 GB/s (both 24 and 32 GPU-core versions).'},
+  {group:'M1 official', name:'M1 Max — 64GB', chip:'M1 Max', mem:64, bw:400, source:'official', note:'Official M1 Max bandwidth: 400 GB/s (both 24 and 32 GPU-core versions).'},
+  {group:'M4 reference', name:'M4 basic — 16GB', chip:'M4', mem:16, bw:120, source:'official', note:'M4-family reference preset.'},
+  {group:'M4 reference', name:'M4 Pro — 24GB', chip:'M4 Pro', mem:24, bw:273, source:'official', note:'M4 Pro reference preset.'},
+  {group:'M4 reference', name:'M4 Max 32 GPU — 36GB', chip:'M4 Max', mem:36, bw:410, source:'official', note:'Binned M4 Max bandwidth.'},
+  {group:'M4 reference', name:'M4 Max 40 GPU — 64GB', chip:'M4 Max', mem:64, bw:546, source:'official', note:'Full M4 Max bandwidth.'},
+  {group:'M4 reference', name:'M4 Max 40 GPU — 128GB', chip:'M4 Max', mem:128, bw:546, source:'official', note:'Full M4 Max bandwidth.'},
+
+  {group:'M5 official', name:'M5 basic — 16GB', chip:'M5', mem:16, bw:153, source:'official', note:'Official M5 bandwidth: 153 GB/s.'},
+  {group:'M5 official', name:'M5 basic — 24GB', chip:'M5', mem:24, bw:153, source:'official', note:'Official M5 bandwidth: 153 GB/s.'},
+  {group:'M5 official', name:'M5 basic — 32GB', chip:'M5', mem:32, bw:153, source:'official', note:'Official M5 bandwidth: 153 GB/s.'},
+  {group:'M5 official', name:'M5 Pro — 24GB', chip:'M5 Pro', mem:24, bw:307, source:'official', note:'Official M5 Pro bandwidth: 307 GB/s.'},
+  {group:'M5 official', name:'M5 Pro — 48GB', chip:'M5 Pro', mem:48, bw:307, source:'official', note:'Official M5 Pro bandwidth: 307 GB/s.'},
+  {group:'M5 official', name:'M5 Pro — 64GB', chip:'M5 Pro', mem:64, bw:307, source:'official', note:'Official M5 Pro bandwidth: 307 GB/s.'},
+  {group:'M5 official', name:'M5 Max / Pro Max 32 GPU — 36GB', chip:'M5 Max', mem:36, bw:460, source:'official', note:'Apple calls this chip M5 Max, not Pro Max. 32 GPU-core version: 460 GB/s.'},
+  {group:'M5 official', name:'M5 Max / Pro Max 40 GPU — 48GB', chip:'M5 Max', mem:48, bw:614, source:'official', note:'Apple calls this chip M5 Max, not Pro Max. 40 GPU-core version: 614 GB/s.'},
+  {group:'M5 official', name:'M5 Max / Pro Max 40 GPU — 64GB', chip:'M5 Max', mem:64, bw:614, source:'official', note:'Official M5 Max 40 GPU bandwidth: 614 GB/s.'},
+  {group:'M5 official', name:'M5 Max / Pro Max 40 GPU — 128GB', chip:'M5 Max', mem:128, bw:614, source:'official', note:'Official M5 Max 40 GPU bandwidth: 614 GB/s.'},
+
+  {group:'M5 reported/inferred', name:'M5 Ultra — 96GB', chip:'M5 Ultra', mem:96, bw:1228, source:'reported/inferred', note:'M5 Ultra bandwidth is set to 1228 GB/s = 2 × M5 Max 614 GB/s. Treat as reported/inferred unless Apple confirms exact spec.'},
+  {group:'M5 reported/inferred', name:'M5 Ultra — 128GB', chip:'M5 Ultra', mem:128, bw:1228, source:'reported/inferred', note:'M5 Ultra bandwidth is set to 1228 GB/s = 2 × M5 Max 614 GB/s. Treat as reported/inferred unless Apple confirms exact spec.'},
+  {group:'M5 reported/inferred', name:'M5 Ultra — 192GB', chip:'M5 Ultra', mem:192, bw:1228, source:'reported/inferred', note:'M5 Ultra bandwidth is set to 1228 GB/s = 2 × M5 Max 614 GB/s. Treat as reported/inferred unless Apple confirms exact spec.'},
+  {group:'M5 reported/inferred', name:'M5 Ultra — 256GB', chip:'M5 Ultra', mem:256, bw:1228, source:'reported/inferred', note:'Requested cap: 256GB. Bandwidth editable.'},
+
+  {group:'M6 official', name:'M6 basic — 16GB', chip:'M6', mem:16, bw:153, source:'official', note:'Official M6 16GB Mac mini bandwidth: 153 GB/s.'},
+  {group:'M6 official', name:'M6 basic — 24GB', chip:'M6', mem:24, bw:170, source:'official', note:'Official M6 higher-memory Mac mini bandwidth: 170 GB/s.'},
+  {group:'M6 official', name:'M6 basic — 32GB', chip:'M6', mem:32, bw:170, source:'official', note:'Official M6 higher-memory Mac mini bandwidth: 170 GB/s.'},
+  {group:'M6 projected placeholders', name:'M6 Pro — 48GB [TBD]', chip:'M6 Pro', mem:48, bw:307, source:'projected', note:'No official M6 Pro bandwidth found. Placeholder uses M5 Pro 307 GB/s; edit bandwidth if you have a confirmed value.'},
+  {group:'M6 projected placeholders', name:'M6 Pro — 64GB [TBD]', chip:'M6 Pro', mem:64, bw:307, source:'projected', note:'No official M6 Pro bandwidth found. Placeholder uses M5 Pro 307 GB/s; edit bandwidth if you have a confirmed value.'},
+  {group:'M6 projected placeholders', name:'M6 Max / Pro Max — 64GB [TBD]', chip:'M6 Max', mem:64, bw:614, source:'projected', note:'No official M6 Max bandwidth found. Placeholder uses M5 Max 614 GB/s; edit bandwidth if you have a confirmed value.'},
+  {group:'M6 projected placeholders', name:'M6 Max / Pro Max — 128GB [TBD]', chip:'M6 Max', mem:128, bw:614, source:'projected', note:'No official M6 Max bandwidth found. Placeholder uses M5 Max 614 GB/s; edit bandwidth if you have a confirmed value.'},
+  {group:'M6 projected placeholders', name:'M6 Ultra — 128GB [TBD]', chip:'M6 Ultra', mem:128, bw:1228, source:'projected', note:'No official M6 Ultra bandwidth found. Placeholder uses 2 × M5 Max bandwidth; edit bandwidth if confirmed.'},
+  {group:'M6 projected placeholders', name:'M6 Ultra — 256GB [TBD]', chip:'M6 Ultra', mem:256, bw:1228, source:'projected', note:'No official M6 Ultra bandwidth found. Placeholder uses 2 × M5 Max bandwidth; edit bandwidth if confirmed.'},
+
+  {group:'M3 Ultra official', name:'M3 Ultra — 96GB', chip:'M3 Ultra', mem:96, bw:819, source:'official', note:'Official M3 Ultra: over 800 GB/s; preset uses 819 GB/s.'},
+  {group:'M3 Ultra official', name:'M3 Ultra — 128GB', chip:'M3 Ultra', mem:128, bw:819, source:'official', note:'Official M3 Ultra: over 800 GB/s; preset uses 819 GB/s.'},
+  {group:'M3 Ultra official', name:'M3 Ultra — 256GB', chip:'M3 Ultra', mem:256, bw:819, source:'official', note:'Official M3 Ultra: configurable up to 512GB; over 800 GB/s.'},
+  {group:'M3 Ultra official', name:'M3 Ultra — 512GB', chip:'M3 Ultra', mem:512, bw:819, source:'official', note:'Official M3 Ultra: configurable up to 512GB; over 800 GB/s.'},
+
+  {group:'Custom', name:'Custom', chip:'Custom', mem:128, bw:546, source:'manual', note:'Manual preset. Edit memory and bandwidth directly.'}
+];
+const quants = [
+  {name:'FP16 / BF16', bpp:16, overhead:1.02},
+  {name:'8-bit', bpp:8, overhead:1.06},
+  {name:'Q6 / 6-bit', bpp:6, overhead:1.08},
+  {name:'Q5 / 5-bit', bpp:5, overhead:1.10},
+  {name:'Q4 / 4-bit', bpp:4.5, overhead:1.12},
+  {name:'Q3 / 3-bit', bpp:3.5, overhead:1.15},
+  {name:'Q2 / 2-bit', bpp:2.7, overhead:1.20}
+];
+let current = null;
+let models = [];
+
+function init(){
+  $('macPreset').innerHTML = renderMacOptions();
+  $('macPreset').value = macs.findIndex(m => m.name === 'M5 Max / Pro Max 40 GPU — 128GB');
+  $('quant').innerHTML = quants.map((q,i)=>`<option value="${i}">${q.name}</option>`).join('');
+  $('quant').value = 4;
+  applyMac(); updateCtxLabel(); bind(); autoDetectMachine();
+}
+function renderMacOptions(){
+  const groups = [];
+  for(const [i,m] of macs.entries()){
+    let g = groups.find(x => x.name === m.group);
+    if(!g){ g = {name:m.group, items:[]}; groups.push(g); }
+    g.items.push(`<option value="${i}">${m.name} · ${m.mem}GB · ${m.bw}GB/s</option>`);
+  }
+  return groups.map(g => `<optgroup label="${escapeHtml(g.name)}">${g.items.join('')}</optgroup>`).join('');
+}
+function bind(){
+  ['unifiedGB','bandwidth','reserveGB','marginPct','ctx','quant','kvBytes','runtimeGB','batch','manualParams'].forEach(id=>$(id).addEventListener('input', recalc));
+  $('macPreset').addEventListener('change', applyMac);
+  $('fetchBtn').addEventListener('click', ()=>fetchModels());
+  $('searchBtn').addEventListener('click', ()=>fetchModels($('search').value.trim()));
+  $('search').addEventListener('keydown', e=>{ if(e.key==='Enter') fetchModels($('search').value.trim()) });
+  $('sort').addEventListener('change', ()=>fetchModels($('search').value.trim()));
+  $('customBtn').addEventListener('click', ()=>{
+    const p = parseFloat($('manualParams').value || '0');
+    if(!p){ showError('Enter manual model params in billions first.'); return; }
+    current = {id:`Manual ${p}B`, paramsB:p, arch:estimateArch(p), source:'manual'};
+    renderSelected(); recalc();
+  });
+}
+function applyMac(){
+  const m = macs[+$('macPreset').value];
+  $('unifiedGB').value = m.mem; $('bandwidth').value = m.bw;
+  $('presetNote').innerHTML = `<b>${escapeHtml(m.chip)}</b> · ${escapeHtml(m.source)} · ${escapeHtml(m.note)}`;
+  recalc();
+}
+function detectAppleChip(){
+  try{
+    const c = document.createElement('canvas');
+    const gl = c.getContext('webgl2') || c.getContext('webgl') || c.getContext('experimental-webgl');
+    if(!gl) return {};
+    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    const s = String((dbg && gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)) || gl.getParameter(gl.RENDERER) || '');
+    const m = s.match(/Apple M(\d+)(?:\s+(Pro|Max|Ultra))?/i);
+    if(m){
+      const gen = 'M' + m[1];
+      const variant = m[2] ? m[2][0].toUpperCase() + m[2].slice(1).toLowerCase() : '';
+      return {gen, variant, label:`Apple ${gen}${variant?' '+variant:''}`, renderer:s};
+    }
+    if(/apple gpu/i.test(s)) return {gen:null, variant:'', label:'Apple GPU (chip not exposed by browser)', renderer:s};
+    return {};
+  }catch(e){ return {}; }
+}
+function autoDetectMachine(){
+  const d = detectAppleChip();
+  if(!d.renderer && !d.label) return; // no GPU info or non-Apple machine: keep default preset
+  const norm = v => v ? v[0].toUpperCase()+v.slice(1).toLowerCase() : '';
+  const detVariant = norm(d.variant);
+  let best = -1, bestScore = 0;
+  if(d.gen){
+    macs.forEach((mac,i)=>{
+      String(mac.chip).split('/').forEach(tok=>{
+        const mt = tok.trim().match(/^(M\d+)(?:\s+(Pro|Max|Ultra))?$/i);
+        if(!mt) return;
+        const gen = mt[1], variant = norm(mt[2]); // mt[1] already includes the M prefix
+        let score = -1;
+        if(gen === d.gen){
+          if(detVariant === variant) score = tok.trim().toLowerCase() === `${d.gen}${detVariant?' '+detVariant:''}`.toLowerCase() ? 3.5 : 3;
+          else if(detVariant) score = -1; // detected a tier (Pro/Max/Ultra) with no matching preset: don't guess a wrong tier
+          else if(!variant) score = 2;    // base chip detected: only base presets qualify
+        }
+        if(score > bestScore){ bestScore = score; best = i; }
+      });
+    });
+  }
+  if(best < 0){ // unresolved Apple Silicon: fall back to the reference preset
+    best = macs.findIndex(m => m.group === 'Older / current reference');
+    if(best < 0) return;
+  }
+  $('macPreset').value = best;
+  applyMac();
+  const why = d.gen
+    ? (bestScore >= 3
+        ? `Auto-detected via WebGL GPU report: <b>${escapeHtml(d.label)}</b>. Browsers can't read unified memory, so the smallest config for this chip is preselected — set your RAM in the Memory field.`
+        : `Detected <b>${escapeHtml(d.label)}</b> — no exact preset for this chip. Reference preset preselected; pick the closest chip above.`)
+    : `Apple Silicon detected, but the browser hides the exact chip — pick yours from the preset menu.`;
+  $('presetNote').innerHTML += `<br><span style="color:var(--muted)">${why}</span>`;
+}
+function updateCtxLabel(){ $('ctxLabel').textContent = fmtTokens(+$('ctx').value); }
+function showError(msg=''){ $('error').textContent = msg; }
+function fmtGB(x){ if(!isFinite(x)) return '—'; return x>=100?`${x.toFixed(0)} GB`:`${x.toFixed(1)} GB`; }
+function fmtTokens(n){ return n>=1048576 ? `${(n/1048576).toFixed(0)}M` : n>=1024 ? `${(n/1024).toFixed(0)}k` : `${n}`; }
+function safe(v,d='—'){ return v===undefined||v===null||v===''?d:v; }
+
+async function fetchModels(query=''){
+  showError(''); $('fetchBtn').classList.add('loading'); $('models').innerHTML='<div style="padding:18px;color:var(--muted)">Loading from Hugging Face…</div>';
+  try{
+    const sort = $('sort').value;
+    const url = new URL('/api/models', HF);
+    url.searchParams.set('pipeline_tag','text-generation');
+    url.searchParams.set('sort', sort);
+    url.searchParams.set('direction','-1');
+    url.searchParams.set('limit','50');
+    url.searchParams.append('expand[]','safetensors');
+    url.searchParams.append('expand[]','config');
+    url.searchParams.append('expand[]','downloads');
+    url.searchParams.append('expand[]','likes');
+    url.searchParams.append('expand[]','tags');
+    if(query) url.searchParams.set('search', query);
+    const r = await fetch(url.toString());
+    if(!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+    const data = await r.json();
+    models = data.map(normalizeModel).filter(m=>m.paramsB || looksLLM(m));
+    renderModels();
+  }catch(e){
+    showError('Could not fetch Hugging Face models. Browser CORS, ad blockers, or API changes may block it. You can still use manual params.\n'+e.message);
+    $('models').innerHTML='<div style="padding:18px;color:var(--muted)">Fetch failed. Use manual model params or retry.</div>';
+  }finally{ $('fetchBtn').classList.remove('loading'); }
+}
+function looksLLM(m){ return /(llama|qwen|gemma|mistral|phi|deepseek|yi-|mixtral|nemotron|command|falcon|gpt|glm)/i.test(m.id); }
+function normalizeModel(x){
+  const id = x.id || x.modelId || '';
+  let paramsB = paramsFromSafetensors(x.safetensors) || paramsFromConfig(x.config) || paramsFromName(id, x.tags||[]);
+  const arch = archFromConfig(x.config, paramsB);
+  return {raw:x,id,paramsB,arch,downloads:x.downloads,likes:x.likes,tags:x.tags||[],source:paramsB?'metadata/name':'unknown'};
+}
+function paramsFromSafetensors(st){
+  if(!st) return null;
+  if(typeof st.total === 'number') return st.total/1e9;
+  if(st.parameters){
+    const total = Object.values(st.parameters).reduce((a,b)=>a+(typeof b==='number'?b:0),0);
+    if(total) return total/1e9;
+  }
+  if(st.parameter_count){
+    const total = Object.values(st.parameter_count).reduce((a,b)=>a+(typeof b==='number'?b:0),0);
+    if(total) return total/1e9;
+  }
+  return null;
+}
+function paramsFromConfig(c){
+  if(!c) return null;
+  const keys = ['num_parameters','n_params','parameter_count'];
+  for(const k of keys){ if(typeof c[k] === 'number') return c[k]/1e9; }
+  return null;
+}
+function paramsFromName(id,tags=[]){
+  const s = [id,...tags].join(' ');
+  const m = s.match(/(?:^|[^a-z0-9])([0-9]+(?:\.[0-9]+)?)\s*([bBmM])(?:[^a-z0-9]|$)/);
+  if(!m) return null;
+  const val = parseFloat(m[1]);
+  return m[2].toLowerCase()==='b' ? val : val/1000;
+}
+function archFromConfig(c,paramsB){
+  const a = c || {};
+  const layers = a.num_hidden_layers || a.n_layer || a.num_layers || a.n_layers;
+  const hidden = a.hidden_size || a.n_embd || a.d_model;
+  const heads = a.num_attention_heads || a.n_head || a.num_heads;
+  const kvHeads = a.num_key_value_heads || a.multi_query_group_num || heads;
+  const vocab = a.vocab_size;
+  if(layers && hidden) return {layers, hidden, heads, kvHeads, vocab, estimated:false};
+  return estimateArch(paramsB || 7);
+}
+function estimateArch(p){
+  if(p <= 1.5) return {layers:24, hidden:2048, heads:16, kvHeads:8, estimated:true};
+  if(p <= 4) return {layers:32, hidden:3072, heads:24, kvHeads:8, estimated:true};
+  if(p <= 9) return {layers:32, hidden:4096, heads:32, kvHeads:8, estimated:true};
+  if(p <= 15) return {layers:40, hidden:5120, heads:40, kvHeads:8, estimated:true};
+  if(p <= 35) return {layers:48, hidden:6144, heads:48, kvHeads:8, estimated:true};
+  if(p <= 80) return {layers:80, hidden:8192, heads:64, kvHeads:8, estimated:true};
+  if(p <= 180) return {layers:96, hidden:12288, heads:96, kvHeads:8, estimated:true};
+  return {layers:120, hidden:16384, heads:128, kvHeads:8, estimated:true};
+}
+function renderModels(){
+  if(!models.length){ $('models').innerHTML='<div style="padding:18px;color:var(--muted)">No models found.</div>'; return; }
+  $('models').innerHTML = models.map((m,i)=>`
+    <div class="model" data-i="${i}">
+      <div><b>${escapeHtml(m.id)}</b><div class="model-meta">
+        <span class="pill">${m.paramsB?m.paramsB.toFixed(m.paramsB<10?1:0)+'B':'params ?'}</span>
+        <span class="pill">↓ ${safe(m.downloads,0).toLocaleString()}</span>
+        <span class="pill">♥ ${safe(m.likes,0).toLocaleString()}</span>
+        ${m.arch.estimated?'<span class="pill">estimated arch</span>':'<span class="pill">config arch</span>'}
+      </div></div><div class="muted">›</div>
+    </div>`).join('');
+  document.querySelectorAll('.model').forEach(el=>el.addEventListener('click',()=>{current=models[+el.dataset.i]; renderSelected(); recalc(); document.querySelectorAll('.model').forEach(x=>x.classList.remove('active')); el.classList.add('active');}));
+}
+function escapeHtml(s){return s.replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
+function renderSelected(){ $('selected').textContent = current ? current.id : 'No model selected'; }
+
+function estimateMemory(){
+  if(!current || !current.paramsB) return null;
+  const q = quants[+$('quant').value];
+  const ctx = +$('ctx').value; updateCtxLabel();
+  const kvBytes = parseFloat($('kvBytes').value);
+  const batch = Math.max(1, +$('batch').value || 1);
+  const a = current.arch || estimateArch(current.paramsB);
+  const gqa = a.heads && a.kvHeads ? Math.min(1, a.kvHeads/a.heads) : 1;
+  const weights = current.paramsB * 1e9 * q.bpp / 8 / 1024**3 * q.overhead;
+  const kv = 2 * a.layers * ctx * a.hidden * kvBytes * gqa * batch / 1024**3;
+  const runtime = +$('runtimeGB').value || 0;
+  const subtotal = weights + kv + runtime;
+  const margin = subtotal * ((+$('marginPct').value || 0)/100);
+  const total = subtotal + margin;
+  const usable = Math.max(0,(+$('unifiedGB').value || 0) - (+$('reserveGB').value || 0));
+  return {weights,kv,runtime,margin,total,usable,q,a,gqa,ctx,batch};
+}
+function recalc(){
+  updateCtxLabel();
+  const e = estimateMemory();
+  if(!e){ return; }
+  const pct = e.usable ? (e.total/e.usable)*100 : 999;
+  $('totalMem').textContent = fmtGB(e.total); $('usableMem').textContent = fmtGB(e.usable); $('kvMem').textContent = fmtGB(e.kv);
+  $('barFill').style.width = Math.min(100,pct)+'%';
+  const cls = pct<85?'good':pct<105?'warn':'bad';
+  const title = pct<85?'Fits with headroom':pct<105?'Borderline':'Probably will not fit';
+  $('fitTitle').innerHTML = `<span class="${cls}">${title}</span>`;
+  const bw = +$('bandwidth').value || 0;
+  const approxTok = bw && e.total ? Math.max(1, bw*0.55 / Math.max(e.weights,1)) : null;
+  $('speedHint').textContent = approxTok ? `~${approxTok.toFixed(1)} tok/s*` : '—';
+  $('explain').textContent = `${current.id}: ${current.paramsB.toFixed(current.paramsB<10?1:0)}B params, ${e.q.name}, ${fmtTokens(e.ctx)} context, ${e.batch} sequence(s). Uses ${pct.toFixed(0)}% of estimated usable unified memory. *Speed hint is only a rough memory-bandwidth heuristic for decode, not a benchmark.`;
+  $('breakRows').innerHTML = rows([
+    ['Weights', fmtGB(e.weights)], ['KV cache', fmtGB(e.kv)], ['Runtime buffers', fmtGB(e.runtime)], ['Safety margin', fmtGB(e.margin)], ['Total', fmtGB(e.total)]
+  ]);
+  $('archRows').innerHTML = rows([
+    ['Params', `${current.paramsB.toFixed(2)}B`], ['Layers', e.a.layers], ['Hidden size', e.a.hidden], ['Attention heads', safe(e.a.heads)], ['KV heads', safe(e.a.kvHeads)], ['GQA ratio', e.gqa.toFixed(3)], ['Source', e.a.estimated?'estimated':'model config']
+  ]);
+}
+function rows(arr){ return arr.map(([k,v])=>`<tr><th>${k}</th><td>${v}</td></tr>`).join(''); }
+init();
+</script>
+</body>
+</html>
