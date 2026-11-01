@@ -1,6 +1,6 @@
 # Apple Silicon LLM Memory Calculator
 
-**[🚀 Open the calculator →](https://meirm.github.io/-apple_silicon_llm_memory/)** — one HTML file, no install. *(First-time setup on GitHub: Settings → Pages → Deploy from a branch → `main` / `/` root. Until enabled, you can [view the source of `index.html`](https://github.com/meirm/-apple_silicon_llm_memory/blob/main/index.html) and download it.)*
+**[🚀 Open the calculator →](https://meirm.github.io/apple_silicon_llm_memory/)** — one HTML file, no install. *(First-time setup on GitHub: Settings → Pages → Deploy from a branch → `main` / `/` root. Until enabled, you can [view the source of `index.html`](https://github.com/meirm/apple_silicon_llm_memory/blob/main/index.html) and download it.)*
 
 A single-file browser tool that answers one question: **"Will this LLM actually fit on my Mac?"**
 
